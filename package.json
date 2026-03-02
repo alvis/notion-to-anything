@@ -1,0 +1,69 @@
+{
+  "name": "notion-to-anything",
+  "version": "1.0.0",
+  "description": "use notion as a CMS for your website",
+  "keywords": [
+    "notion",
+    "cms",
+    "markdown"
+  ],
+  "homepage": "https://github.com/alvis/notion-to-anything#readme",
+  "bugs": {
+    "url": "https://github.com/alvis/notion-to-anything/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/alvis/notion-to-anything.git"
+  },
+  "license": "MIT",
+  "sideEffects": false,
+  "type": "module",
+  "imports": {
+    "#types": "./src/types/index.ts",
+    "#*": "./src/*.ts"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./transformers": "./src/transformers/index.ts"
+  },
+  "scripts": {
+    "build": "run build",
+    "lint": "run lint --",
+    "prepare": "run prepare",
+    "prepublishOnly": "run prepublishOnly",
+    "release": "run release --",
+    "test": "run test --",
+    "test:coverage": "run coverage --",
+    "test:watch": "run watch --",
+    "typecheck": "run typecheck --"
+  },
+  "dependencies": {
+    "@notionhq/client": "^5.0.0",
+    "p-queue": "^9.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@vitest/coverage-v8": "^4.0.0",
+    "presetter": "^8.0.0",
+    "presetter-preset-esm": "^8.0.0",
+    "presetter-preset-strict": "^8.0.0",
+    "type-fest": "^5.0.0",
+    "typescript": "^5.9.0",
+    "undici": "^7.0.0",
+    "vitest": "^4.0.0"
+  },
+  "packageManager": "pnpm@10.30.0",
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "exports": {
+      ".": "./lib/index.js",
+      "./transformers": "./lib/transformers/index.js"
+    },
+    "imports": {
+      "#types": "./lib/types/index.js",
+      "#*": "./lib/*.js"
+    }
+  }
+}
