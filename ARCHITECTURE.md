@@ -141,9 +141,56 @@ Built-ins:
 
 ## 👤 User Enrichment
 
-- `UserResolver` caches `users.retrieve` requests by user ID.
+- `UserResolver` caches `users.retrieve` requests by user ID (enabled by default).
 - `resolveEntityUsers()` upgrades partial `created_by` and `last_edited_by`.
 - Enrichment is used when retrieving/searching pages and datasources, and while resolving parents.
+- User resolution caching can be disabled by passing `cache: false` to `new Notion()`, which forwards `{ cache: false }` to the `UserResolver` constructor.
+
+## 🗄️ Entity Caching
+
+The library supports opt-in entity caching to avoid redundant API calls when the same entity is accessed multiple times.
+
+### Two-Tier Cache
+
+1. **User resolution cache** (`UserResolver`): enabled by default, deduplicates concurrent user lookups. Disabled when `cache: false` is set globally.
+2. **Entity cache** (`EntityCache`): opt-in via `cache: true` on `new Notion()` or per-call via `GetEntityOptions`. Stores promises for pages, databases, and datasources.
+
+### Configuration
+
+| Configuration | Entity Cache | User Resolution Cache |
+|---|---|---|
+| `new Notion()` (default) | OFF | ON |
+| `new Notion({ cache: true })` | ON | ON |
+| `new Notion({ cache: false })` | OFF | OFF |
+| Per-call `{ cache: true }` | ON (that call) | unchanged |
+| Per-call `{ cache: false }` | OFF (that call) | unchanged |
+
+### EntityCache Propagation
+
+A single `EntityCache` object is created in the `Notion` class and threaded through `EntityOptions` to all child entities. Its presence in `EntityOptions` acts as the caching flag — no separate boolean needed:
+
+```typescript
+// Cache present → caching enabled (no-op when absent)
+const cached = this.cache?.pages.get(id);
+this.cache?.pages.set(id, promise);
+```
+
+### Promise Memoization
+
+Cached values are stored as `Promise<T>` rather than `T`. This deduplicates concurrent requests for the same entity — the first caller creates the promise, subsequent callers share it.
+
+### Error Eviction
+
+Failed API calls (rejected promises) are automatically evicted from the cache via `.catch()` side-effects, so retries make fresh API calls:
+
+```typescript
+effectiveCache?.pages.set(id, promise);
+promise.catch(() => effectiveCache?.pages.delete(id));
+```
+
+### Cache Population from Search
+
+`searchPages()`, `searchDataSources()`, and `NotionDataSource.search()` populate the entity cache with their results, so subsequent `getPage()` or `getDataSource()` calls for those entities return cached instances without additional API calls.
 
 ## 🧩 Metadata Normalization
 
@@ -158,9 +205,9 @@ This avoids entity-specific metadata branching for consumers.
 
 ## 🔗 Circular Dependency Strategy
 
-`NotionEntity.getParent()` and `NotionDatabase.getDataSources()` use dynamic imports (`await import(...)`) for sibling entity classes.
+`NotionEntity.getParent()` and `NotionDatabase.getDataSources()` use an `EntityFactory` interface injected via `EntityOptions` to create sibling entity instances without direct imports.
 
-This prevents static import cycles between `entity.ts`, `page.ts`, `datasource.ts`, and `database.ts`.
+The `defaultEntityFactory` in `entity-factory.ts` provides the concrete implementations. This prevents static import cycles between `entity.ts`, `page.ts`, `datasource.ts`, and `database.ts`.
 
 ## 📂 Module Map
 

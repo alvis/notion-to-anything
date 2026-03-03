@@ -8,6 +8,7 @@ import { NotionPage } from '#page';
 import { take } from '#take';
 import { NotionUser, UserResolver, resolveEntityUsers } from '#user';
 
+import type { EntityCache } from '#entity';
 import type { NotionAPIDataSource, NotionAPIPage, QueryOptions } from '#types';
 
 /** configuration options for creating a Notion client */
@@ -16,6 +17,17 @@ export interface NotionOptions {
   client?: Client;
   /** default maximum number of concurrent operations for all methods */
   concurrency?: number;
+  /**
+   * enable entity caching for all entity retrieval (default: false);
+   * set to false to also disable user resolution caching (default: true)
+   */
+  cache?: boolean;
+}
+
+/** options for individual entity retrieval */
+export interface GetEntityOptions {
+  /** override caching for this call (default: inherited from global) */
+  cache?: boolean;
 }
 
 /** a simple Notion client */
@@ -23,6 +35,8 @@ export class Notion {
   readonly #client: Client;
   readonly #userResolver: UserResolver;
   readonly #concurrency?: number;
+  readonly #cache: boolean;
+  readonly #entityCache: EntityCache;
 
   /**
    * creates a Notion client with plugin options
@@ -38,8 +52,16 @@ export class Notion {
     const { client = new Client({ fetch }) } = { ...options };
 
     this.#client = client;
-    this.#userResolver = new UserResolver(client);
+    this.#userResolver = new UserResolver(client, {
+      cache: options?.cache !== false,
+    });
     this.#concurrency = options?.concurrency;
+    this.#cache = options?.cache ?? false;
+    this.#entityCache = {
+      pages: new Map(),
+      databases: new Map(),
+      dataSources: new Map(),
+    };
   }
 
   /**
@@ -60,66 +82,126 @@ export class Notion {
   /**
    * retrieves a database by its uuid
    * @param id the uuid of the database
+   * @param options optional per-call caching configuration
    * @returns a NotionDatabase instance that allows further operations
    */
-  public async getDatabase(id: string): Promise<NotionDatabase> {
-    const database = await this.#client.databases.retrieve({
-      database_id: id,
-    });
+  public async getDatabase(
+    id: string,
+    options?: GetEntityOptions,
+  ): Promise<NotionDatabase> {
+    const useCache = options?.cache ?? this.#cache;
+    const effectiveCache = useCache ? this.#entityCache : undefined;
 
-    if (!('url' in database)) {
-      throw new Error(`database ${id} is not accessible`);
+    const cached = effectiveCache?.databases.get(id);
+    if (cached) {
+      return cached;
     }
 
-    return new NotionDatabase(this.#client, database, {
-      userResolver: this.#userResolver,
-      concurrency: this.#concurrency,
-      entityFactory: defaultEntityFactory,
-    });
+    const promise = (async () => {
+      const database = await this.#client.databases.retrieve({
+        database_id: id,
+      });
+
+      if (!('url' in database)) {
+        throw new Error(`database ${id} is not accessible`);
+      }
+
+      return new NotionDatabase(this.#client, database, {
+        userResolver: this.#userResolver,
+        concurrency: this.#concurrency,
+        entityFactory: defaultEntityFactory,
+        cache: effectiveCache,
+      });
+    })();
+
+    effectiveCache?.databases.set(id, promise);
+    promise.catch(() => effectiveCache?.databases.delete(id));
+
+    return promise;
   }
 
   /**
    * retrieves a datasource by its uuid
    * @param id the uuid of the datasource
+   * @param options optional per-call caching configuration
    * @returns a NotionDataSource instance that allows further operations
    */
-  public async getDataSource(id: string): Promise<NotionDataSource> {
-    const dataSource = await this.#client.dataSources.retrieve({
-      data_source_id: id,
-    });
+  public async getDataSource(
+    id: string,
+    options?: GetEntityOptions,
+  ): Promise<NotionDataSource> {
+    const useCache = options?.cache ?? this.#cache;
+    const effectiveCache = useCache ? this.#entityCache : undefined;
 
-    if (!('parent' in dataSource)) {
-      throw new Error(`datasource ${id} is not accessible`);
+    const cached = effectiveCache?.dataSources.get(id);
+    if (cached) {
+      return cached;
     }
 
-    const enriched = await resolveEntityUsers(dataSource, this.#userResolver);
+    const promise = (async () => {
+      const dataSource = await this.#client.dataSources.retrieve({
+        data_source_id: id,
+      });
 
-    return new NotionDataSource(this.#client, enriched, {
-      userResolver: this.#userResolver,
-      concurrency: this.#concurrency,
-      entityFactory: defaultEntityFactory,
-    });
+      if (!('parent' in dataSource)) {
+        throw new Error(`datasource ${id} is not accessible`);
+      }
+
+      const enriched = await resolveEntityUsers(dataSource, this.#userResolver);
+
+      return new NotionDataSource(this.#client, enriched, {
+        userResolver: this.#userResolver,
+        concurrency: this.#concurrency,
+        entityFactory: defaultEntityFactory,
+        cache: effectiveCache,
+      });
+    })();
+
+    effectiveCache?.dataSources.set(id, promise);
+    promise.catch(() => effectiveCache?.dataSources.delete(id));
+
+    return promise;
   }
 
   /**
    * retrieves a page by its uuid
    * @param id the uuid of the page
+   * @param options optional per-call caching configuration
    * @returns a NotionPage instance that allows further operations
    */
-  public async getPage(id: string): Promise<NotionPage> {
-    const page = await this.#client.pages.retrieve({ page_id: id });
+  public async getPage(
+    id: string,
+    options?: GetEntityOptions,
+  ): Promise<NotionPage> {
+    const useCache = options?.cache ?? this.#cache;
+    const effectiveCache = useCache ? this.#entityCache : undefined;
 
-    if (!('parent' in page)) {
-      throw new Error(`page ${id} is not accessible`);
+    const cached = effectiveCache?.pages.get(id);
+    if (cached) {
+      return cached;
     }
 
-    const enriched = await resolveEntityUsers(page, this.#userResolver);
+    const promise = (async () => {
+      const page = await this.#client.pages.retrieve({ page_id: id });
 
-    return new NotionPage(this.#client, enriched, {
-      userResolver: this.#userResolver,
-      concurrency: this.#concurrency,
-      entityFactory: defaultEntityFactory,
-    });
+      if (!('parent' in page)) {
+        throw new Error(`page ${id} is not accessible`);
+      }
+
+      const enriched = await resolveEntityUsers(page, this.#userResolver);
+
+      return new NotionPage(this.#client, enriched, {
+        userResolver: this.#userResolver,
+        concurrency: this.#concurrency,
+        entityFactory: defaultEntityFactory,
+        cache: effectiveCache,
+      });
+    })();
+
+    effectiveCache?.pages.set(id, promise);
+    promise.catch(() => effectiveCache?.pages.delete(id));
+
+    return promise;
   }
 
   /**
@@ -165,16 +247,23 @@ export class Notion {
       )
       .slice(effectiveOffset);
 
+    const effectiveCache = this.#cache ? this.#entityCache : undefined;
+
     const pages = await mapWithConcurrency(
       accessiblePages,
       async (page) => {
         const enriched = await resolveEntityUsers(page, this.#userResolver);
 
-        return new NotionPage(this.#client, enriched, {
+        const notionPage = new NotionPage(this.#client, enriched, {
           userResolver: this.#userResolver,
           concurrency: this.#concurrency,
           entityFactory: defaultEntityFactory,
+          cache: effectiveCache,
         });
+
+        effectiveCache?.pages.set(notionPage.id, Promise.resolve(notionPage));
+
+        return notionPage;
       },
       concurrency,
       { signal: options?.signal },
@@ -196,11 +285,9 @@ export class Notion {
       options?.limit !== undefined
         ? effectiveOffset + options.limit
         : undefined;
-
     const sort = options?.sorts?.[0]
       ? mapWorkspaceSort(options.sorts[0])
       : undefined;
-
     const concurrency = resolveConcurrency(
       options?.concurrency ?? this.#concurrency,
     );
@@ -228,20 +315,21 @@ export class Notion {
           entity.object === 'data_source' && 'parent' in entity,
       )
       .slice(effectiveOffset);
+    const effectiveCache = this.#cache ? this.#entityCache : undefined;
 
     const dataSources = await mapWithConcurrency(
       accessibleDataSources,
-      async (dataSource) => {
-        const enriched = await resolveEntityUsers(
-          dataSource,
-          this.#userResolver,
-        );
-
-        return new NotionDataSource(this.#client, enriched, {
+      async (source) => {
+        const enriched = await resolveEntityUsers(source, this.#userResolver);
+        const entity = new NotionDataSource(this.#client, enriched, {
           userResolver: this.#userResolver,
           concurrency: this.#concurrency,
           entityFactory: defaultEntityFactory,
+          cache: effectiveCache,
         });
+        effectiveCache?.dataSources.set(entity.id, Promise.resolve(entity));
+
+        return entity;
       },
       concurrency,
       { signal: options?.signal },

@@ -1,5 +1,5 @@
 export { Notion } from './notion';
-export type { NotionOptions } from './notion';
+export type { GetEntityOptions, NotionOptions } from './notion';
 
 export { DEFAULT_CONCURRENCY } from '#constants';
 

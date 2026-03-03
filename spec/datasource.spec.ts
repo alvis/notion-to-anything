@@ -10,6 +10,7 @@ import { buildDummyDataSource } from './fixtures/factories/datasource';
 import { buildDummyPage } from './fixtures/factories/page';
 import { setupDataSource } from './mocks/api';
 
+import type { EntityCache } from '#entity';
 import type { NotionAPIDataSource } from '#types';
 
 describe('cl:NotionDataSource', () => {
@@ -423,6 +424,36 @@ describe('cl:NotionDataSource', () => {
         expect.any(Object),
         expect.objectContaining({ signal: controller.signal }),
       );
+    });
+
+    it('should populate cache with page entities from search results', async () => {
+      const entityCache: EntityCache = {
+        pages: new Map(),
+        databases: new Map(),
+        dataSources: new Map(),
+      };
+      const dataSource = new NotionDataSource(
+        client,
+        buildDummyDataSource({ id: 'cache-pop-db' }),
+        { cache: entityCache },
+      );
+
+      vi.spyOn(takeModule, 'take').mockResolvedValue({
+        entities: [
+          buildDummyPage({
+            pageID: 'cached-search-page',
+            parent: { type: 'database_id', database_id: 'cache-pop-db' },
+          }),
+        ],
+      });
+
+      const result = await dataSource.search();
+
+      expect(result.pages).toHaveLength(1);
+      expect(entityCache.pages.has('cached-search-page')).toBe(true);
+
+      const cachedPage = await entityCache.pages.get('cached-search-page');
+      expect(cachedPage).toBe(result.pages[0]);
     });
 
     it('should ignore offset when cursor is provided', async () => {

@@ -2,6 +2,7 @@ import { Client } from '@notionhq/client';
 import { describe, expect, it, vi } from 'vitest';
 
 import { NotionDatabase } from '#database';
+import { NotionDataSource } from '#datasource';
 import { defaultEntityFactory } from '#entity-factory';
 import { UserResolver } from '#user';
 
@@ -9,6 +10,8 @@ import { defaultTime } from './fixtures/common';
 import { buildDummyDatabase } from './fixtures/factories/database';
 import { buildDummyDataSource } from './fixtures/factories/datasource';
 import { createPlainText } from './fixtures/factories/richtext';
+
+import type { EntityCache } from '#entity';
 
 describe('cl:NotionDatabase', () => {
   describe('mt:getMetadata', () => {
@@ -213,6 +216,77 @@ describe('cl:NotionDatabase', () => {
       const result = await db.getDataSources();
 
       expect(result).toEqual([expect.objectContaining({ id: 'ds-enriched' })]);
+    });
+
+    it('should return cached datasource without API call', async () => {
+      const fetch = vi.fn<typeof globalThis.fetch>();
+      const testClient = new Client({
+        fetch,
+        logger: () => undefined,
+      });
+
+      const ds = buildDummyDataSource({ id: 'ds-cached' });
+
+      const entityCache: EntityCache = {
+        pages: new Map(),
+        databases: new Map(),
+        dataSources: new Map(),
+      };
+
+      // pre-populate cache
+      const cachedDs = new NotionDataSource(testClient, ds);
+      entityCache.dataSources.set('ds-cached', Promise.resolve(cachedDs));
+
+      const db = new NotionDatabase(
+        testClient,
+        buildDummyDatabase({
+          dataSources: [{ id: 'ds-cached', name: 'Cached' }],
+        }),
+        { entityFactory: defaultEntityFactory, cache: entityCache },
+      );
+
+      const result = await db.getDataSources();
+
+      expect(result).toHaveLength(1);
+      expect(result[0]).toBe(cachedDs);
+      expect(fetch).not.toHaveBeenCalled();
+    });
+
+    it('should populate cache after retrieving datasources', async () => {
+      const fetch = vi.fn<typeof globalThis.fetch>();
+      const testClient = new Client({
+        fetch,
+        logger: () => undefined,
+      });
+
+      const ds = buildDummyDataSource({ id: 'ds-pop' });
+      fetch.mockResolvedValueOnce(
+        new Response(JSON.stringify(ds), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      );
+
+      const entityCache: EntityCache = {
+        pages: new Map(),
+        databases: new Map(),
+        dataSources: new Map(),
+      };
+
+      const db = new NotionDatabase(
+        testClient,
+        buildDummyDatabase({
+          dataSources: [{ id: 'ds-pop', name: 'Pop' }],
+        }),
+        { entityFactory: defaultEntityFactory, cache: entityCache },
+      );
+
+      const result = await db.getDataSources();
+
+      expect(entityCache.dataSources.has('ds-pop')).toBe(true);
+
+      const cached = await entityCache.dataSources.get('ds-pop');
+      expect(cached).toBe(result[0]);
     });
   });
 });

@@ -63,6 +63,11 @@ export class NotionDatabase extends NotionEntity {
     const results = await mapWithConcurrency(
       this.#database.data_sources,
       async (ref) => {
+        const cached = this.cache?.dataSources.get(ref.id);
+        if (cached) {
+          return cached;
+        }
+
         const dataSource = await this.client.dataSources.retrieve({
           data_source_id: ref.id,
         });
@@ -75,11 +80,20 @@ export class NotionDatabase extends NotionEntity {
           ? await resolveEntityUsers(dataSource, this.userResolver)
           : dataSource;
 
-        return this.entityFactory!.createDataSource(this.client, enriched, {
-          userResolver: this.userResolver,
-          concurrency: this.concurrency,
-          entityFactory: this.entityFactory,
-        });
+        const entity = this.entityFactory!.createDataSource(
+          this.client,
+          enriched,
+          {
+            userResolver: this.userResolver,
+            concurrency: this.concurrency,
+            entityFactory: this.entityFactory,
+            cache: this.cache,
+          },
+        );
+
+        this.cache?.dataSources.set(ref.id, Promise.resolve(entity));
+
+        return entity;
       },
       concurrency,
       { signal: options?.signal },

@@ -104,11 +104,16 @@ export class NotionDataSource extends NotionEntity {
           ? await resolveEntityUsers(page, this.userResolver)
           : page;
 
-        return new NotionPage(this.client, enriched, {
+        const notionPage = new NotionPage(this.client, enriched, {
           userResolver: this.userResolver,
           concurrency: this.concurrency,
           entityFactory: this.entityFactory,
+          cache: this.cache,
         });
+
+        this.cache?.pages.set(notionPage.id, Promise.resolve(notionPage));
+
+        return notionPage;
       },
       concurrency,
       { signal: options?.signal },

@@ -632,6 +632,238 @@ describe('cl:Notion', () => {
     });
   });
 
+  describe('entity caching', () => {
+    it('should return cached page on second getPage call when cache is enabled globally', async () => {
+      const pageResponse = buildDummyPage({ pageID: 'cached-page' });
+      fetch.mockResolvedValueOnce(
+        new Response(JSON.stringify(pageResponse), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      );
+      const cachedClient = new Notion({
+        client: new Client({ fetch, logger: () => undefined }),
+        cache: true,
+      });
+
+      const first = await cachedClient.getPage('cached-page');
+      const second = await cachedClient.getPage('cached-page');
+
+      expect(first).toBe(second);
+      expect(fetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('should return cached database on second getDatabase call when cache is enabled globally', async () => {
+      const dbResponse = buildDummyDatabase({ id: 'cached-db' });
+      fetch.mockResolvedValueOnce(
+        new Response(JSON.stringify(dbResponse), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      );
+      const cachedClient = new Notion({
+        client: new Client({ fetch, logger: () => undefined }),
+        cache: true,
+      });
+
+      const first = await cachedClient.getDatabase('cached-db');
+      const second = await cachedClient.getDatabase('cached-db');
+
+      expect(first).toBe(second);
+      expect(fetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('should return cached datasource on second getDataSource call when cache is enabled globally', async () => {
+      const dsResponse = buildDummyDataSource({ id: 'cached-ds' });
+      fetch.mockResolvedValueOnce(
+        new Response(JSON.stringify(dsResponse), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      );
+      const cachedClient = new Notion({
+        client: new Client({ fetch, logger: () => undefined }),
+        cache: true,
+      });
+
+      const first = await cachedClient.getDataSource('cached-ds');
+      const second = await cachedClient.getDataSource('cached-ds');
+
+      expect(first).toBe(second);
+      expect(fetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('should cache per-call when cache option overrides default off', async () => {
+      const pageResponse = buildDummyPage({ pageID: 'per-call-page' });
+      fetch.mockResolvedValueOnce(
+        new Response(JSON.stringify(pageResponse), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      );
+      const uncachedClient = new Notion({
+        client: new Client({ fetch, logger: () => undefined }),
+      });
+
+      const first = await uncachedClient.getPage('per-call-page', {
+        cache: true,
+      });
+      const second = await uncachedClient.getPage('per-call-page', {
+        cache: true,
+      });
+
+      expect(first).toBe(second);
+      expect(fetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('should bypass cache per-call when cache option overrides global on', async () => {
+      const pageResponse = buildDummyPage({ pageID: 'bypass-page' });
+      fetch
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify(pageResponse), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          }),
+        )
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify(pageResponse), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          }),
+        );
+      const cachedClient = new Notion({
+        client: new Client({ fetch, logger: () => undefined }),
+        cache: true,
+      });
+
+      await cachedClient.getPage('bypass-page');
+      await cachedClient.getPage('bypass-page', { cache: false });
+
+      expect(fetch).toHaveBeenCalledTimes(2);
+    });
+
+    it('should evict failed page from cache on rejection', async () => {
+      const errorResponse = {
+        code: 'object_not_found',
+        message: 'Not found',
+        object: 'error',
+        request_id: 'request-id',
+        status: 404,
+      };
+      const pageResponse = buildDummyPage({ pageID: 'evict-page' });
+      fetch
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify(errorResponse), {
+            status: 404,
+            headers: { 'Content-Type': 'application/json' },
+          }),
+        )
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify(pageResponse), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          }),
+        );
+      const cachedClient = new Notion({
+        client: new Client({ fetch, logger: () => undefined }),
+        cache: true,
+      });
+
+      await expect(cachedClient.getPage('evict-page')).rejects.toThrow();
+
+      const result = await cachedClient.getPage('evict-page');
+
+      expect(result).toBeInstanceOf(NotionPage);
+      expect(fetch).toHaveBeenCalledTimes(2);
+    });
+
+    it('should disable user resolution cache when cache is explicitly false', async () => {
+      const userResponse = buildUser({ id: 'user-1', name: 'Alice' });
+      const pageResponse = {
+        ...buildDummyPage({ pageID: 'no-user-cache-page' }),
+        created_by: { object: 'user' as const, id: 'user-1' },
+      };
+      fetch
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify(pageResponse), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          }),
+        )
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify(userResponse), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          }),
+        )
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify(pageResponse), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          }),
+        )
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify(userResponse), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          }),
+        );
+      const noCacheClient = new Notion({
+        client: new Client({ fetch, logger: () => undefined }),
+        cache: false,
+      });
+
+      await noCacheClient.getPage('no-user-cache-page');
+      await noCacheClient.getPage('no-user-cache-page');
+
+      // 2 page fetches + 2 user resolves (user cache disabled, no dedup)
+      expect(fetch).toHaveBeenCalledTimes(4);
+    });
+
+    it('should populate page cache from searchPages results', async () => {
+      const pages = [buildDummyPage({ pageID: 'search-cached-page' })];
+      fetch.mockResolvedValueOnce(
+        new Response(JSON.stringify(searchResponse(pages)), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      );
+      const cachedClient = new Notion({
+        client: new Client({ fetch, logger: () => undefined }),
+        cache: true,
+      });
+
+      const { pages: searchResults } = await cachedClient.searchPages({
+        query: 'test',
+      });
+      const direct = await cachedClient.getPage('search-cached-page');
+
+      expect(direct).toBe(searchResults[0]);
+      expect(fetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('should populate datasource cache from searchDataSources results', async () => {
+      const dataSources = [buildDummyDataSource({ id: 'search-cached-ds' })];
+      fetch.mockResolvedValueOnce(
+        new Response(JSON.stringify(searchResponse(dataSources)), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      );
+      const cachedClient = new Notion({
+        client: new Client({ fetch, logger: () => undefined }),
+        cache: true,
+      });
+
+      const { dataSources: searchResults } =
+        await cachedClient.searchDataSources({ query: 'test' });
+      const direct = await cachedClient.getDataSource('search-cached-ds');
+
+      expect(direct).toBe(searchResults[0]);
+      expect(fetch).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('concurrency option', () => {
     it('should reject invalid global concurrency in constructor', () => {
       expect(

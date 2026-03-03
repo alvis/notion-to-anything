@@ -144,6 +144,26 @@ export async function listSearchResults(query: string): Promise<string[]> {
 }
 ```
 
+### Example: entity caching
+
+Enable global caching so repeated `getPage` / `getDatabase` / `getDataSource` calls reuse the same API response. Search results also populate the cache.
+
+```ts
+const notion = new Notion({
+  client: new Client({ auth: process.env.NOTION_TOKEN }),
+  cache: true,
+});
+
+// First call fetches from the API
+const page = await notion.getPage('page-id');
+
+// Second call returns cached instance — no API call
+const same = await notion.getPage('page-id');
+
+// Per-call override: skip cache for a fresh fetch
+const fresh = await notion.getPage('page-id', { cache: false });
+```
+
 ## 📚 API Reference
 
 ### Core Client
@@ -151,13 +171,14 @@ export async function listSearchResults(query: string): Promise<string[]> {
 <details>
 <summary><code>new Notion(options?: NotionOptions)</code></summary>
 
-**Description:** Creates a client wrapper around `@notionhq/client` with optional global concurrency control.
+**Description:** Creates a client wrapper around `@notionhq/client` with optional global concurrency control and entity caching.
 
 **Parameters:**
 
 - `options` (`NotionOptions`): optional configuration object
 - `options.client` (`Client`): pre-configured Notion SDK client
 - `options.concurrency` (`number`): positive integer default for concurrent enrichment/traversal operations
+- `options.cache` (`boolean`): enable entity caching for all entity retrieval (default: `false`); set to `false` to also disable user resolution caching (default: `true`)
 
 **Throws:**
 
@@ -172,6 +193,7 @@ import { Notion } from 'notion-to-anything';
 const notion = new Notion({
   client: new Client({ auth: process.env.NOTION_TOKEN }),
   concurrency: 10,
+  cache: true, // enable entity caching
 });
 ```
 
@@ -197,13 +219,15 @@ const notion = new Notion({
 </details>
 
 <details>
-<summary><code>getDatabase(id: string): Promise&lt;NotionDatabase&gt;</code></summary>
+<summary><code>getDatabase(id: string, options?: GetEntityOptions): Promise&lt;NotionDatabase&gt;</code></summary>
 
 **Description:** Retrieves a database entity instance by UUID.
 
 **Parameters:**
 
 - `id` (`string`): database UUID
+- `options` (`GetEntityOptions`): optional per-call caching configuration
+- `options.cache` (`boolean`): override global caching for this call
 
 **Returns:**
 
@@ -212,13 +236,15 @@ const notion = new Notion({
 </details>
 
 <details>
-<summary><code>getDataSource(id: string): Promise&lt;NotionDataSource&gt;</code></summary>
+<summary><code>getDataSource(id: string, options?: GetEntityOptions): Promise&lt;NotionDataSource&gt;</code></summary>
 
 **Description:** Retrieves a data source entity instance by UUID.
 
 **Parameters:**
 
 - `id` (`string`): data source UUID
+- `options` (`GetEntityOptions`): optional per-call caching configuration
+- `options.cache` (`boolean`): override global caching for this call
 
 **Returns:**
 
@@ -227,13 +253,15 @@ const notion = new Notion({
 </details>
 
 <details>
-<summary><code>getPage(id: string): Promise&lt;NotionPage&gt;</code></summary>
+<summary><code>getPage(id: string, options?: GetEntityOptions): Promise&lt;NotionPage&gt;</code></summary>
 
 **Description:** Retrieves a page entity instance by UUID.
 
 **Parameters:**
 
 - `id` (`string`): page UUID
+- `options` (`GetEntityOptions`): optional per-call caching configuration
+- `options.cache` (`boolean`): override global caching for this call
 
 **Returns:**
 

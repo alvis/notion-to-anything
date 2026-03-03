@@ -15,6 +15,16 @@ import type {
 } from '#types';
 import type { UserResolver } from '#user';
 
+/** shared entity cache store keyed by entity ID */
+export interface EntityCache {
+  /** cached page promises keyed by page ID */
+  pages: Map<string, Promise<NotionPage>>;
+  /** cached database promises keyed by database ID */
+  databases: Map<string, Promise<NotionDatabase>>;
+  /** cached datasource promises keyed by datasource ID */
+  dataSources: Map<string, Promise<NotionDataSource>>;
+}
+
 /** options for configuring a Notion entity */
 export interface EntityOptions {
   /** resolver for enriching partial user references */
@@ -23,6 +33,8 @@ export interface EntityOptions {
   concurrency?: number;
   /** factory for creating entity instances without circular dependencies */
   entityFactory?: EntityFactory;
+  /** shared entity cache — presence enables caching, absence disables it */
+  cache?: EntityCache;
 }
 
 /** factory for creating entity instances to break circular dependencies */
@@ -111,6 +123,7 @@ export class NotionEntity {
   readonly #userResolver?: UserResolver;
   readonly #concurrency?: number;
   readonly #entityFactory?: EntityFactory;
+  readonly #cache?: EntityCache;
   #metadata: NotionMetadata;
 
   /**
@@ -133,6 +146,7 @@ export class NotionEntity {
     this.#userResolver = options?.userResolver;
     this.#concurrency = options?.concurrency;
     this.#entityFactory = options?.entityFactory;
+    this.#cache = options?.cache;
     this.#metadata = getMetadata(entity);
 
     this.id = entity.id;
@@ -173,6 +187,21 @@ export class NotionEntity {
     return this.#entityFactory;
   }
 
+  /** exposes the entity cache to subclasses */
+  protected get cache(): EntityCache | undefined {
+    return this.#cache;
+  }
+
+  /** shared entity options for child entity creation */
+  private get childOptions(): EntityOptions {
+    return {
+      userResolver: this.#userResolver,
+      concurrency: this.#concurrency,
+      entityFactory: this.#entityFactory,
+      cache: this.#cache,
+    };
+  }
+
   /**
    * gets the metadata of the entity
    * @returns metadata
@@ -202,73 +231,113 @@ export class NotionEntity {
     parent: NotionAPIEntitySource['parent'],
   ): Promise<ParentEntity | null> {
     switch (parent.type) {
-      case 'page_id': {
-        const page = await this.#client.pages.retrieve({
-          page_id: parent.page_id,
-        });
-
-        if (!('url' in page)) {
-          throw new Error(`page ${parent.page_id} is not accessible`);
-        }
-
-        const enrichedPage = this.#userResolver
-          ? await resolveEntityUsers(page, this.#userResolver)
-          : page;
-
-        return this.#entityFactory!.createPage(this.#client, enrichedPage, {
-          userResolver: this.#userResolver,
-          concurrency: this.#concurrency,
-          entityFactory: this.#entityFactory,
-        });
-      }
-
-      case 'database_id': {
-        const database = await this.#client.databases.retrieve({
-          database_id: parent.database_id,
-        });
-
-        if (!('url' in database)) {
-          throw new Error(
-            `database ${parent.database_id} is not accessible`,
-          );
-        }
-
-        return this.#entityFactory!.createDatabase(this.#client, database, {
-          userResolver: this.#userResolver,
-          concurrency: this.#concurrency,
-          entityFactory: this.#entityFactory,
-        });
-      }
-
-      case 'data_source_id': {
-        const dataSource = await this.#client.dataSources.retrieve({
-          data_source_id: parent.data_source_id,
-        });
-
-        if (!('url' in dataSource)) {
-          throw new Error(
-            `datasource ${parent.data_source_id} is not accessible`,
-          );
-        }
-
-        const enrichedDataSource = this.#userResolver
-          ? await resolveEntityUsers(dataSource, this.#userResolver)
-          : dataSource;
-
-        return this.#entityFactory!.createDataSource(
-          this.#client,
-          enrichedDataSource,
-          {
-            userResolver: this.#userResolver,
-            concurrency: this.#concurrency,
-            entityFactory: this.#entityFactory,
-          },
-        );
-      }
-
-      default: {
+      case 'page_id':
+        return this.resolvePageParent(parent.page_id);
+      case 'database_id':
+        return this.resolveDatabaseParent(parent.database_id);
+      case 'data_source_id':
+        return this.resolveDataSourceParent(parent.data_source_id);
+      default:
         return null;
-      }
     }
+  }
+
+  /**
+   * resolves a page parent by ID, using cache when available
+   * @param id the page ID to resolve
+   * @returns the resolved page entity
+   * @throws {Error} if the page is not accessible
+   */
+  private async resolvePageParent(id: string): Promise<NotionPage> {
+    const cached = this.#cache?.pages.get(id);
+    if (cached) {
+      return cached;
+    }
+
+    const page = await this.#client.pages.retrieve({ page_id: id });
+
+    if (!('url' in page)) {
+      throw new Error(`page ${id} is not accessible`);
+    }
+
+    const enriched = this.#userResolver
+      ? await resolveEntityUsers(page, this.#userResolver)
+      : page;
+
+    const entity = this.#entityFactory!.createPage(
+      this.#client,
+      enriched,
+      this.childOptions,
+    );
+
+    this.#cache?.pages.set(id, Promise.resolve(entity));
+
+    return entity;
+  }
+
+  /**
+   * resolves a database parent by ID, using cache when available
+   * @param id the database ID to resolve
+   * @returns the resolved database entity
+   * @throws {Error} if the database is not accessible
+   */
+  private async resolveDatabaseParent(id: string): Promise<NotionDatabase> {
+    const cached = this.#cache?.databases.get(id);
+    if (cached) {
+      return cached;
+    }
+
+    const database = await this.#client.databases.retrieve({
+      database_id: id,
+    });
+
+    if (!('url' in database)) {
+      throw new Error(`database ${id} is not accessible`);
+    }
+
+    const entity = this.#entityFactory!.createDatabase(
+      this.#client,
+      database,
+      this.childOptions,
+    );
+
+    this.#cache?.databases.set(id, Promise.resolve(entity));
+
+    return entity;
+  }
+
+  /**
+   * resolves a datasource parent by ID, using cache when available
+   * @param id the datasource ID to resolve
+   * @returns the resolved datasource entity
+   * @throws {Error} if the datasource is not accessible
+   */
+  private async resolveDataSourceParent(id: string): Promise<NotionDataSource> {
+    const cached = this.#cache?.dataSources.get(id);
+    if (cached) {
+      return cached;
+    }
+
+    const dataSource = await this.#client.dataSources.retrieve({
+      data_source_id: id,
+    });
+
+    if (!('url' in dataSource)) {
+      throw new Error(`datasource ${id} is not accessible`);
+    }
+
+    const enriched = this.#userResolver
+      ? await resolveEntityUsers(dataSource, this.#userResolver)
+      : dataSource;
+
+    const entity = this.#entityFactory!.createDataSource(
+      this.#client,
+      enriched,
+      this.childOptions,
+    );
+
+    this.#cache?.dataSources.set(id, Promise.resolve(entity));
+
+    return entity;
   }
 }

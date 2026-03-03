@@ -10,6 +10,7 @@ import { buildDummyDatabase } from './fixtures/factories/database';
 import { buildDummyDataSource } from './fixtures/factories/datasource';
 import { buildDummyPage } from './fixtures/factories/page';
 
+import type { EntityCache } from '#entity';
 import type { NotionAPIPage, NotionMetadata } from '#types';
 
 const defaultMetadata = {
@@ -451,6 +452,157 @@ describe('cl:NotionEntity', () => {
       await expect(entity.getParent()).rejects.toThrow(
         'datasource inaccessible-ds-id is not accessible',
       );
+    });
+
+    it('should return cached page parent without API call', async () => {
+      const fetch = vi.fn<typeof globalThis.fetch>();
+      const testClient = new Client({
+        fetch,
+        logger: () => undefined,
+      });
+
+      const parentPage = buildDummyPage({ pageID: 'cached-parent-page' });
+      fetch.mockResolvedValueOnce(
+        new Response(JSON.stringify(parentPage), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      );
+
+      const entityCache: EntityCache = {
+        pages: new Map(),
+        databases: new Map(),
+        dataSources: new Map(),
+      };
+
+      // first entity to populate cache
+      const childPage1 = buildDummyPage({
+        pageID: 'child-1',
+        parent: { type: 'page_id', page_id: 'cached-parent-page' },
+      });
+      const entity1 = new NotionEntity(testClient, childPage1, {
+        entityFactory: defaultEntityFactory,
+        cache: entityCache,
+      });
+      const parent1 = await entity1.getParent();
+
+      // second entity using cache
+      const childPage2 = buildDummyPage({
+        pageID: 'child-2',
+        parent: { type: 'page_id', page_id: 'cached-parent-page' },
+      });
+      const entity2 = new NotionEntity(testClient, childPage2, {
+        entityFactory: defaultEntityFactory,
+        cache: entityCache,
+      });
+      const parent2 = await entity2.getParent();
+
+      expect(parent1).not.toBeNull();
+      expect(parent2).not.toBeNull();
+      expect(parent1).toBe(parent2);
+      expect(fetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('should return cached database parent without API call', async () => {
+      const fetch = vi.fn<typeof globalThis.fetch>();
+      const testClient = new Client({
+        fetch,
+        logger: () => undefined,
+      });
+
+      const parentDb = buildDummyDatabase({ id: 'cached-parent-db' });
+      fetch.mockResolvedValueOnce(
+        new Response(JSON.stringify(parentDb), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      );
+
+      const entityCache: EntityCache = {
+        pages: new Map(),
+        databases: new Map(),
+        dataSources: new Map(),
+      };
+
+      const childPage1 = buildDummyPage({
+        pageID: 'child-db-1',
+        parent: { type: 'database_id', database_id: 'cached-parent-db' },
+      });
+      const entity1 = new NotionEntity(testClient, childPage1, {
+        entityFactory: defaultEntityFactory,
+        cache: entityCache,
+      });
+      const parent1 = await entity1.getParent();
+
+      const childPage2 = buildDummyPage({
+        pageID: 'child-db-2',
+        parent: { type: 'database_id', database_id: 'cached-parent-db' },
+      });
+      const entity2 = new NotionEntity(testClient, childPage2, {
+        entityFactory: defaultEntityFactory,
+        cache: entityCache,
+      });
+      const parent2 = await entity2.getParent();
+
+      expect(parent1).not.toBeNull();
+      expect(parent2).not.toBeNull();
+      expect(parent1).toBe(parent2);
+      expect(fetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('should return cached datasource parent without API call', async () => {
+      const fetch = vi.fn<typeof globalThis.fetch>();
+      const testClient = new Client({
+        fetch,
+        logger: () => undefined,
+      });
+
+      const parentDs = buildDummyDataSource({ id: 'cached-parent-ds' });
+      fetch.mockResolvedValueOnce(
+        new Response(JSON.stringify(parentDs), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      );
+
+      const entityCache: EntityCache = {
+        pages: new Map(),
+        databases: new Map(),
+        dataSources: new Map(),
+      };
+
+      const childDs1 = {
+        ...buildDummyDataSource({ id: 'child-ds-cache-1' }),
+        parent: {
+          type: 'data_source_id' as const,
+          data_source_id: 'cached-parent-ds',
+          database_id: 'parent-db-id',
+        },
+      };
+      const entity1 = new NotionEntity(testClient, childDs1, {
+        entityFactory: defaultEntityFactory,
+        cache: entityCache,
+      });
+      const parent1 = await entity1.getParent();
+
+      const childDs2 = {
+        ...buildDummyDataSource({ id: 'child-ds-cache-2' }),
+        parent: {
+          type: 'data_source_id' as const,
+          data_source_id: 'cached-parent-ds',
+          database_id: 'parent-db-id',
+        },
+      };
+      const entity2 = new NotionEntity(testClient, childDs2, {
+        entityFactory: defaultEntityFactory,
+        cache: entityCache,
+      });
+      const parent2 = await entity2.getParent();
+
+      expect(parent1).not.toBeNull();
+      expect(parent2).not.toBeNull();
+      expect(parent1).toBe(parent2);
+      expect(fetch).toHaveBeenCalledTimes(1);
     });
   });
 

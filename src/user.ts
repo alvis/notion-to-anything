@@ -42,13 +42,19 @@ export class UserResolver {
   /** cache mapping user IDs to promise-wrapped user objects */
   readonly #cache: Map<string, Promise<NotionAPIUser | null>>;
 
+  /** whether caching is enabled for user lookups */
+  readonly #cacheEnabled: boolean;
+
   /**
    * creates a resolver that caches user lookups
    * @param client the Notion API client
+   * @param options optional configuration for caching behavior
+   * @param options.cache whether to enable caching for deduplication (default: true)
    */
-  constructor(client: Client) {
+  constructor(client: Client, options?: { cache?: boolean }) {
     this.#client = client;
     this.#cache = new Map();
+    this.#cacheEnabled = options?.cache !== false;
   }
 
   /** number of cached entries */
@@ -62,10 +68,12 @@ export class UserResolver {
    * @returns the full user object, or null if inaccessible
    */
   public async resolve(userId: string): Promise<NotionAPIUser | null> {
-    const cached = this.#cache.get(userId);
+    if (this.#cacheEnabled) {
+      const cached = this.#cache.get(userId);
 
-    if (cached) {
-      return cached;
+      if (cached) {
+        return cached;
+      }
     }
 
     const promise = this.#client.users
@@ -73,7 +81,9 @@ export class UserResolver {
       .then((user) => (isPartialUser(user) ? null : user))
       .catch(() => null);
 
-    this.#cache.set(userId, promise);
+    if (this.#cacheEnabled) {
+      this.#cache.set(userId, promise);
+    }
 
     return promise;
   }

@@ -198,6 +198,46 @@ describe('cl:UserResolver', () => {
       expect(resolver.size).toBe(2);
     });
   });
+
+  describe('cache disabled', () => {
+    it('should make separate API calls for repeated resolution of same user ID', async () => {
+      fetch
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify(userResponse), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          }),
+        )
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify(userResponse), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          }),
+        );
+      const resolver = new UserResolver(client, { cache: false });
+
+      const first = await resolver.resolve('user-1');
+      const second = await resolver.resolve('user-1');
+
+      expect(first).toEqual(userResponse);
+      expect(second).toEqual(userResponse);
+      expect(fetch).toHaveBeenCalledTimes(2);
+    });
+
+    it('should return zero for size when cache is disabled', async () => {
+      fetch.mockResolvedValueOnce(
+        new Response(JSON.stringify(userResponse), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      );
+      const resolver = new UserResolver(client, { cache: false });
+
+      await resolver.resolve('user-1');
+
+      expect(resolver.size).toBe(0);
+    });
+  });
 });
 
 describe('fn:resolveEntityUsers', () => {
