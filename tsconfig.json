@@ -1,0 +1,12 @@
+{
+  "include": [
+    "**/*.ts"
+  ],
+  "references": [],
+  "compilerOptions": {
+    "module": "ESNext",
+    "target": "ES2024",
+    "moduleResolution": "bundler",
+    "baseUrl": "."
+  }
+}
