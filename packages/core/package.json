@@ -19,6 +19,7 @@
   "type": "module",
   "imports": {
     "#entities/*": "./src/entities/*.ts",
+    "#transformer/*": "./src/transformer/*.ts",
     "#traversal/*": "./src/traversal/*.ts",
     "#types/*": "./src/types/*.ts"
   },
@@ -63,6 +64,10 @@
       "#entities/*": {
         "types": "./lib/entities/*.d.ts",
         "default": "./lib/entities/*.js"
+      },
+      "#transformer/*": {
+        "types": "./lib/transformer/*.d.ts",
+        "default": "./lib/transformer/*.js"
       },
       "#traversal/*": {
         "types": "./lib/traversal/*.d.ts",
