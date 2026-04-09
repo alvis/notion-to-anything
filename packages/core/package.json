@@ -18,6 +18,7 @@
   "sideEffects": false,
   "type": "module",
   "imports": {
+    "#client/*": "./src/client/*.ts",
     "#entities/*": "./src/entities/*.ts",
     "#transformer/*": "./src/transformer/*.ts",
     "#traversal/*": "./src/traversal/*.ts",
@@ -61,6 +62,10 @@
       }
     },
     "imports": {
+      "#client/*": {
+        "types": "./lib/client/*.d.ts",
+        "default": "./lib/client/*.js"
+      },
       "#entities/*": {
         "types": "./lib/entities/*.d.ts",
         "default": "./lib/entities/*.js"

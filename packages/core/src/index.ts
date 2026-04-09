@@ -1,3 +1,4 @@
+export * from './client/index';
 export * from './entities/index';
 export * from './transformer/index';
 export * from './traversal/index';
