@@ -18,7 +18,9 @@
   "sideEffects": false,
   "type": "module",
   "imports": {
-    "#traversal/*": "./src/traversal/*.ts"
+    "#entities/*": "./src/entities/*.ts",
+    "#traversal/*": "./src/traversal/*.ts",
+    "#types/*": "./src/types/*.ts"
   },
   "exports": {
     ".": "./src/index.ts",
@@ -37,7 +39,11 @@
     "*": "true"
   },
   "dependencies": {
-    "p-queue": "^9.0.0"
+    "p-queue": "^9.0.0",
+    "type-fest": "^5.0.0"
+  },
+  "devDependencies": {
+    "undici": "^7.0.0"
   },
   "peerDependencies": {
     "@notionhq/client": "^5.0.0"
@@ -54,9 +60,17 @@
       }
     },
     "imports": {
+      "#entities/*": {
+        "types": "./lib/entities/*.d.ts",
+        "default": "./lib/entities/*.js"
+      },
       "#traversal/*": {
         "types": "./lib/traversal/*.d.ts",
         "default": "./lib/traversal/*.js"
+      },
+      "#types/*": {
+        "types": "./lib/types/*.d.ts",
+        "default": "./lib/types/*.js"
       }
     }
   }
