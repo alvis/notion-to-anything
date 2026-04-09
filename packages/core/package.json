@@ -1,0 +1,63 @@
+{
+  "name": "@notion-to-anything/core",
+  "version": "1.0.0",
+  "description": "core utilities for notion-to-anything",
+  "keywords": [
+    "notion",
+    "cms"
+  ],
+  "homepage": "https://github.com/alvis/notion-to-anything-monorepo#readme",
+  "bugs": {
+    "url": "https://github.com/alvis/notion-to-anything-monorepo/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/alvis/notion-to-anything-monorepo.git"
+  },
+  "license": "MIT",
+  "sideEffects": false,
+  "type": "module",
+  "imports": {
+    "#traversal/*": "./src/traversal/*.ts"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./traversal": "./src/traversal/index.ts"
+  },
+  "scripts": {
+    "build": "run build",
+    "coverage": "run coverage --",
+    "lint": "run lint --",
+    "prepare": "run prepare",
+    "test": "run test --",
+    "typecheck": "run typecheck",
+    "watch": "run watch"
+  },
+  "lint-staged": {
+    "*": "true"
+  },
+  "dependencies": {
+    "p-queue": "^9.0.0"
+  },
+  "peerDependencies": {
+    "@notionhq/client": "^5.0.0"
+  },
+  "publishConfig": {
+    "exports": {
+      ".": {
+        "types": "./lib/index.d.ts",
+        "default": "./lib/index.js"
+      },
+      "./traversal": {
+        "types": "./lib/traversal/index.d.ts",
+        "default": "./lib/traversal/index.js"
+      }
+    },
+    "imports": {
+      "#traversal/*": {
+        "types": "./lib/traversal/*.d.ts",
+        "default": "./lib/traversal/*.js"
+      }
+    }
+  }
+}

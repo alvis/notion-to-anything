@@ -18,6 +18,15 @@ importers:
         specifier: ^5.9.0
         version: 5.9.3
 
+  packages/core:
+    dependencies:
+      '@notionhq/client':
+        specifier: ^5.0.0
+        version: 5.17.0
+      p-queue:
+        specifier: ^9.0.0
+        version: 9.1.2
+
 packages:
 
   '@babel/code-frame@7.29.0':
@@ -353,6 +362,10 @@ packages:
   '@nodelib/fs.walk@1.2.8':
     resolution: {integrity: sha512-oGB+UxlgWcgQkgwo8GcEGwemoTFt3FIO9ababBmaGwXIoBKZ+GTy0pP185beGg7Llih/NSHSV2XAs1lnznocSg==}
     engines: {node: '>= 8'}
+
+  '@notionhq/client@5.17.0':
+    resolution: {integrity: sha512-hSNm3VUW5+Qs9vPOmegS6r1RT8O1jtTE/22wmSmiJc9kkb2YyddWr8SBQruvp06rALn2r2RAh9mLPirUUonsvw==}
+    engines: {node: '>=18'}
 
   '@npmcli/agent@4.0.0':
     resolution: {integrity: sha512-kAQTcEN9E8ERLVg5AsGwLNoFb+oEG6engbqAU2P43gD4JEIkNGMHdVQ096FsOAAYpZPB0RSt0zgInKIAS1l5QA==}
@@ -2414,6 +2427,14 @@ packages:
     resolution: {integrity: sha512-tkAQEw8ysMzmkhgw8k+1U/iPhWNhykKnSk4Rd5zLoPJCuJaGRPo6YposrZgaxHKzDHdDWWZvE/Sk7hsL2X/CpQ==}
     engines: {node: '>=18'}
 
+  p-queue@9.1.2:
+    resolution: {integrity: sha512-ktsDOALzTYTWWF1PbkNVg2rOt+HaOaMWJMUnt7T3qf5tvZ1L8dBW3tObzprBcXNMKkwj+yFSLqHso0x+UFcJXw==}
+    engines: {node: '>=20'}
+
+  p-timeout@7.0.1:
+    resolution: {integrity: sha512-AxTM2wDGORHGEkPCt8yqxOTMgpfbEHqF51f/5fJCmwFC3C/zNcGT63SymH2ttOAaiIws2zVg4+izQCjrakcwHg==}
+    engines: {node: '>=20'}
+
   p-try@1.0.0:
     resolution: {integrity: sha512-U1etNYuMJoIz3ZXSrrySFjsXQTWOx2/jdi86L+2pRvph/qMKL6sbcCYdH23fqsbm8TH2Gn0OybpT4eSFlCVHww==}
     engines: {node: '>=4'}
@@ -3591,6 +3612,8 @@ snapshots:
     dependencies:
       '@nodelib/fs.scandir': 2.1.5
       fastq: 1.20.1
+
+  '@notionhq/client@5.17.0': {}
 
   '@npmcli/agent@4.0.0':
     dependencies:
@@ -5812,6 +5835,13 @@ snapshots:
       p-limit: 3.1.0
 
   p-map@7.0.4: {}
+
+  p-queue@9.1.2:
+    dependencies:
+      eventemitter3: 5.0.4
+      p-timeout: 7.0.1
+
+  p-timeout@7.0.1: {}
 
   p-try@1.0.0: {}
 
