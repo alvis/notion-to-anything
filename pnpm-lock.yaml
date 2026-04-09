@@ -34,6 +34,16 @@ importers:
         specifier: ^7.0.0
         version: 7.24.7
 
+  packages/markdown:
+    dependencies:
+      '@notion-to-anything/core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      '@notionhq/client':
+        specifier: ^5.0.0
+        version: 5.17.0
+
 packages:
 
   '@babel/code-frame@7.29.0':
