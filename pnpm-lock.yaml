@@ -54,6 +54,21 @@ importers:
         specifier: ^5.0.0
         version: 5.17.0
 
+  packages/notion-to-anything:
+    dependencies:
+      '@notion-to-anything/core':
+        specifier: workspace:*
+        version: link:../core
+      '@notion-to-anything/json':
+        specifier: workspace:*
+        version: link:../json
+      '@notion-to-anything/markdown':
+        specifier: workspace:*
+        version: link:../markdown
+      '@notionhq/client':
+        specifier: ^5.0.0
+        version: 5.17.0
+
 packages:
 
   '@babel/code-frame@7.29.0':
