@@ -19,6 +19,7 @@
   "sideEffects": false,
   "type": "module",
   "imports": {
+    "#request": "./src/request/index.ts",
     "#types": "./src/types/index.ts",
     "#*": "./src/*.ts"
   },
@@ -38,7 +39,7 @@
     "typecheck": "run typecheck --"
   },
   "dependencies": {
-    "@notionhq/client": "^5.0.0",
+    "@notionhq/client": "^5.22.0",
     "p-queue": "^9.0.0"
   },
   "devDependencies": {
@@ -62,6 +63,7 @@
       "./transformers": "./lib/transformers/index.js"
     },
     "imports": {
+      "#request": "./lib/request/index.js",
       "#types": "./lib/types/index.js",
       "#*": "./lib/*.js"
     }
